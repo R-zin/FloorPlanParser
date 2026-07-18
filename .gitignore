@@ -1,6 +1,6 @@
 # Jupyter Notebook
 .ipynb_checkpoints
-.pkl
+*.pkl
 __pycache__/
 
 ### Vim ###
