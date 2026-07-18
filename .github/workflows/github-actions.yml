@@ -1,0 +1,38 @@
+name: FastAPI CI
+
+on: [push]
+
+jobs:
+  FastAPI-Installation:
+    runs-on: ubuntu-latest
+    steps:
+      - name: CheckOut Code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: |
+          python -m venv .venv
+          source .venv/bin/activate
+          python -m pip install --upgrade pip
+          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+          pip install uvicorn
+      - name: Run FastAPI server and test health endpoint
+        run: |
+          source .venv/bin/activate
+
+          uvicorn main:app --host 127.0.0.1 --port 8000 &
+          SERVER_PID=$!
+
+          # Wait for server to start
+          sleep 5
+
+          # Fail the workflow if /health doesn't return a 2xx response
+          curl --fail http://127.0.0.1:8000/health
+
+          kill $SERVER_PID
