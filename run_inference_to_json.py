@@ -272,7 +272,7 @@ def polygons_to_json(polygons, types, room_polygons, room_types, min_icon_confid
             })
 
         elif poly_type.get("type") == "icon":
-            prob = poly_type.get("prob", 1.0)
+            prob = float(poly_type.get("prob", 1.0))
             if prob < min_icon_confidence:
                 continue  # filter low-confidence noise (observed probs as low as 0.001)
             if dedupe_key in seen_icon_keys:
@@ -305,7 +305,33 @@ def polygons_to_json(polygons, types, room_polygons, room_types, min_icon_confid
                 "polygon": contours,
             })
 
-    return result
+    return _to_json_safe(result)
+
+
+def _to_json_safe(obj):
+    """
+    Recursively converts numpy scalars/arrays anywhere in a nested
+    dict/list structure into native Python types.
+
+    Why this exists rather than fixing individual call sites: round() on a
+    numpy scalar (e.g. np.float32) returns ANOTHER numpy scalar, not a
+    Python float -- numpy scalars implement their own __round__. That's
+    confirmed to have broken `round(prob, 3)` for the confidence field, but
+    get_polygons() could plausibly embed numpy scalars in other places too
+    (e.g. inside a plain list rather than a numpy array, which
+    geometry_to_json's list-handling branch wouldn't catch). Sanitizing the
+    whole structure once, right before it's returned, is more robust than
+    chasing each leak individually.
+    """
+    if isinstance(obj, np.generic):  # any numpy scalar: float32, int64, bool_, etc.
+        return obj.item()
+    if isinstance(obj, np.ndarray):
+        return obj.tolist()
+    if isinstance(obj, dict):
+        return {k: _to_json_safe(v) for k, v in obj.items()}
+    if isinstance(obj, (list, tuple)):
+        return [_to_json_safe(v) for v in obj]
+    return obj
 
 
 def main():
